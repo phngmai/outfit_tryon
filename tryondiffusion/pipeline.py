@@ -1,24 +1,18 @@
+# 📁 tryondiffusion/pipeline.py
 import torch
-from diffusers import StableDiffusionInpaintPipeline
-from tryondiffusion.utils import preprocess_image, save_image
+from .utils import preprocess_image, save_image
 
 class TryOnPipeline:
-    def __init__(self, device="cuda"):
+    def __init__(self, model, device="cuda"):
+        self.model = model
         self.device = device
-        self.pipe = StableDiffusionInpaintPipeline.from_pretrained(
-            "runwayml/stable-diffusion-inpainting",
-            torch_dtype=torch.float16 if device == "cuda" else torch.float32
-        ).to(device)
 
-    def __call__(self, person_img_path, cloth_img_path, output_path="tryon_result.png"):
-        # Load and preprocess images
-        person_img = preprocess_image(person_img_path).to(self.device)
-        cloth_img = preprocess_image(cloth_img_path).to(self.device)
+    def run(self, person_image_path, cloth_image_path, output_path="results/tryon_result.png"):
+        person_tensor = preprocess_image(person_image_path).to(self.device)
+        cloth_tensor = preprocess_image(cloth_image_path).to(self.device)
 
-        # For now, blend cloth and person directly (placeholder logic)
-        # You can insert segmentation/mask logic here to improve realism
-        blend = person_img * 0.6 + cloth_img * 0.4
+        prompt = "a photo of a person wearing a stylish outfit"
+        image = self.model(prompt=prompt, image=person_tensor, strength=0.75).images[0]
 
-        # Save result
-        save_image(blend, output_path)
-        print(f"✅ Result saved to {output_path}")
+        image.save(output_path)
+        print(f"✅ Saved to {output_path}")
