@@ -1,34 +1,49 @@
 import os
+import torch
 from PIL import Image
+from torchvision import transforms
+from tryondiffusion.utils import load_model, save_image, preprocess_image
+from tryondiffusion.pipeline import TryOnPipeline
 
-def apply_fake_tryon(person_image_path, cloth_image_path, output_dir="results"):
-    # Tạo thư mục output nếu chưa có
+def run_tryon(
+    person_image_path: str,
+    cloth_image_path: str,
+    output_dir: str = "results",
+    device: str = "cuda" if torch.cuda.is_available() else "cpu"
+):
     os.makedirs(output_dir, exist_ok=True)
 
-    # Mở ảnh người và ảnh quần áo
-    person_img = Image.open(person_image_path).convert("RGBA")
-    cloth_img = Image.open(cloth_image_path).convert("RGBA")
+    # 1. Load và xử lý ảnh người
+    print("[1/5] Loading person image...")
+    person_img = preprocess_image(person_image_path)
 
-    # Resize ảnh quần áo cho vừa với người (giả định cùng kích thước)
-    cloth_img = cloth_img.resize(person_img.size)
+    # 2. Load và xử lý ảnh quần áo
+    print("[2/5] Loading cloth image...")
+    cloth_img = preprocess_image(cloth_image_path)
 
-    # Giả lập "thử đồ" bằng cách blend 2 ảnh lại
-    blended = Image.blend(person_img, cloth_img, alpha=0.5)
+    # 3. Tải mô hình TryOn
+    print("[3/5] Loading TryOnDiffusion model...")
+    model = load_model(device=device)
 
-    # Lưu kết quả
-    output_path = os.path.join(output_dir, "tryon_result.png")
-    blended.save(output_path)
+    # 4. Thực thi pipeline TryOn
+    print("[4/5] Generating try-on result...")
+    pipeline = TryOnPipeline(model=model, device=device)
+    result_img = pipeline.run(person_img, cloth_img)
 
-    print(f"✅ Saved result to {output_path}")
-    return output_path
+    # 5. Lưu kết quả
+    result_path = os.path.join(output_dir, "tryon_result.png")
+    print(f"[5/5] Saving result to {result_path}")
+    save_image(result_img, result_path)
+
+    return result_path
 
 if __name__ == "__main__":
     import argparse
+    parser = argparse.ArgumentParser(description="AI TryOn Inference")
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--person_image_path", type=str, required=True)
-    parser.add_argument("--cloth_image_path", type=str, required=True)
-    parser.add_argument("--output_dir", type=str, default="results")
+    parser.add_argument("--person_image_path", type=str, required=True, help="Path to person image")
+    parser.add_argument("--cloth_image_path", type=str, required=True, help="Path to cloth image")
+    parser.add_argument("--output_dir", type=str, default="results", help="Output directory")
+
     args = parser.parse_args()
-
-    apply_fake_tryon(args.person_image_path, args.cloth_image_path, args.output_dir)
+    run_tryon(args.person_image_path, args.cloth_image_path, args.output_dir)
